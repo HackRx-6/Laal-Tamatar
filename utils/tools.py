@@ -336,13 +336,15 @@ def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
         logger.info(f"Working in directory: {cwd}")
 
         # Step 1: Add all changes including new files and directories
-        logger.info("Adding all changes to git (including new files and directories)...")
-        
+        logger.info(
+            "Adding all changes to git (including new files and directories)..."
+        )
+
         # First, add all tracked and untracked files and directories
         add_all_result = subprocess.run(
             ["git", "add", "-A"], cwd=cwd, capture_output=True, text=True, timeout=30
         )
-        
+
         if add_all_result.returncode != 0:
             logger.error(f"Git add -A failed: {add_all_result.stderr}")
             add_trace_tags(["git_add_failed"])
@@ -356,7 +358,7 @@ def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
         add_current_result = subprocess.run(
             ["git", "add", "."], cwd=cwd, capture_output=True, text=True, timeout=30
         )
-        
+
         if add_current_result.returncode != 0:
             logger.error(f"Git add . failed: {add_current_result.stderr}")
             add_trace_tags(["git_add_current_failed"])
