@@ -2,6 +2,7 @@ from langchain_core.tools import tool
 import shlex
 import requests
 from .logger import setup_logger, log_function_call
+from utils.parsers import remove_script_tags
 
 logger = setup_logger(__name__)
 
@@ -16,14 +17,14 @@ def make_curl_request(curl_request: str):
         curl_request (str): The complete and correct curl request
     """
     logger.info(f"Received curl request: {curl_request}")
-    
+
     try:
         tokens = shlex.split(curl_request)
         logger.info(f"Parsed tokens: {tokens}")
     except Exception as e:
         logger.error(f"Failed to parse curl command: {e}")
         return {"error": f"Failed to parse curl command: {str(e)}"}
-    
+
     if tokens[0].lower() != "curl":
         logger.error("Invalid curl command - does not start with 'curl'")
         return {"error": "Not a valid curl command"}
@@ -33,12 +34,12 @@ def make_curl_request(curl_request: str):
     headers = {}
     data = None
     i = 1
-    
+
     logger.info("Parsing curl command parameters...")
     while i < len(tokens):
         token = tokens[i]
         logger.debug(f"Processing token: {token}")
-        
+
         if token in ["-X", "--request"]:
             i += 1
             method = tokens[i].upper()
@@ -72,22 +73,24 @@ def make_curl_request(curl_request: str):
 
     try:
         response = requests.request(method, url, headers=headers, data=data)
-        
+
         result = {
             "status_code": response.status_code,
             "headers": dict(response.headers),
             "body": response.text,
         }
-        
+
         logger.info(f"Request successful - Status: {response.status_code}")
         logger.info(f"Response headers: {dict(response.headers)}")
         logger.info(f"Response body length: {len(response.text)} characters")
-        
-        body_preview = response.text[:500] + "..." if len(response.text) > 500 else response.text
+
+        body_preview = (
+            response.text[:500] + "..." if len(response.text) > 500 else response.text
+        )
         logger.debug(f"Response body preview: {body_preview}")
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Request failed: {str(e)}")
         return {"error": str(e)}
