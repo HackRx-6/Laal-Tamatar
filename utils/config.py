@@ -22,8 +22,16 @@ LOG_FORMAT = os.getenv(
     "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
 )
 
-print(f"Logging configuration loaded:")
+# LangSmith Configuration
+LANGSMITH_TRACING = os.getenv("LANGSMITH_TRACING", "true").lower() == "true"
+LANGSMITH_ENDPOINT = os.getenv("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
+LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
+LANGSMITH_PROJECT = os.getenv("LANGSMITH_PROJECT", "hackrx-bajaj")
+
+print("Logging configuration loaded:")
 print(f"  - Log Level: {LOG_LEVEL}")
 print(f"  - Function Calls: {LOG_FUNCTION_CALLS}")
 print(f"  - Requests/Responses: {LOG_REQUESTS_RESPONSES}")
 print(f"  - HTTP Middleware: {LOG_HTTP_MIDDLEWARE}")
+print(f"  - LangSmith Tracing: {LANGSMITH_TRACING}")
+print(f"  - LangSmith Project: {LANGSMITH_PROJECT}")
