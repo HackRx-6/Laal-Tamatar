@@ -318,62 +318,74 @@ def execute_python_code(python_code: str, file_path: Optional[str] = None):
 @log_function_call(logger)
 def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
     """Commit current changes and push them to GitHub.
-    
+
     Args:
         commit_message (str): The commit message for the changes
         branch (str, optional): The branch to push to. If not provided, pushes to current branch.
-        
+
     Returns:
         dict: Contains the git operation results and any output/errors
     """
     logger.info(f"Starting git commit and push with message: {commit_message}")
     add_trace_metadata({"commit_message": commit_message, "target_branch": branch})
     add_trace_tags(["git_commit", "git_push"])
-    
+
     try:
         # Get current working directory
         cwd = os.getcwd()
         logger.info(f"Working in directory: {cwd}")
+
+        # Step 1: Add all changes including new files and directories
+        logger.info("Adding all changes to git (including new files and directories)...")
         
-        # Step 1: Add all changes
-        logger.info("Adding all changes to git...")
-        add_result = subprocess.run(
-            ["git", "add", "."],
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            timeout=30
+        # First, add all tracked and untracked files and directories
+        add_all_result = subprocess.run(
+            ["git", "add", "-A"], cwd=cwd, capture_output=True, text=True, timeout=30
         )
         
-        if add_result.returncode != 0:
-            logger.error(f"Git add failed: {add_result.stderr}")
+        if add_all_result.returncode != 0:
+            logger.error(f"Git add -A failed: {add_all_result.stderr}")
             add_trace_tags(["git_add_failed"])
             return {
                 "success": False,
-                "error": f"Git add failed: {add_result.stderr}",
-                "step": "add"
+                "error": f"Git add -A failed: {add_all_result.stderr}",
+                "step": "add",
             }
+
+        # Also run git add . to ensure current directory and subdirectories are included
+        add_current_result = subprocess.run(
+            ["git", "add", "."], cwd=cwd, capture_output=True, text=True, timeout=30
+        )
         
-        logger.info("Git add successful")
-        
+        if add_current_result.returncode != 0:
+            logger.error(f"Git add . failed: {add_current_result.stderr}")
+            add_trace_tags(["git_add_current_failed"])
+            return {
+                "success": False,
+                "error": f"Git add . failed: {add_current_result.stderr}",
+                "step": "add",
+            }
+
+        logger.info("Git add operations successful")
+
         # Step 2: Check if there are any changes to commit
         status_result = subprocess.run(
             ["git", "status", "--porcelain"],
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=10
+            timeout=10,
         )
-        
+
         if not status_result.stdout.strip():
             logger.info("No changes to commit")
             add_trace_tags(["no_changes"])
             return {
                 "success": True,
                 "message": "No changes to commit",
-                "step": "status_check"
+                "step": "status_check",
             }
-        
+
         # Step 3: Commit changes
         logger.info(f"Committing changes with message: {commit_message}")
         commit_result = subprocess.run(
@@ -381,21 +393,21 @@ def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=30
+            timeout=30,
         )
-        
+
         if commit_result.returncode != 0:
             logger.error(f"Git commit failed: {commit_result.stderr}")
             add_trace_tags(["git_commit_failed"])
             return {
                 "success": False,
                 "error": f"Git commit failed: {commit_result.stderr}",
-                "step": "commit"
+                "step": "commit",
             }
-        
+
         logger.info("Git commit successful")
         commit_output = commit_result.stdout
-        
+
         # Step 4: Push to remote
         if branch:
             push_command = ["git", "push", "origin", branch]
@@ -403,15 +415,15 @@ def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
         else:
             push_command = ["git", "push"]
             logger.info("Pushing to current branch")
-        
+
         push_result = subprocess.run(
             push_command,
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=60  # Longer timeout for push operations
+            timeout=60,  # Longer timeout for push operations
         )
-        
+
         if push_result.returncode != 0:
             logger.error(f"Git push failed: {push_result.stderr}")
             add_trace_tags(["git_push_failed"])
@@ -419,31 +431,33 @@ def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
                 "success": False,
                 "error": f"Git push failed: {push_result.stderr}",
                 "step": "push",
-                "commit_output": commit_output
+                "commit_output": commit_output,
             }
-        
+
         logger.info("Git push successful")
         push_output = push_result.stdout
-        
+
         # Success - return all outputs
         result = {
             "success": True,
             "commit_message": commit_message,
             "commit_output": commit_output,
             "push_output": push_output,
-            "target_branch": branch or "current branch"
+            "target_branch": branch or "current branch",
         }
-        
+
         logger.info("Git commit and push completed successfully")
-        add_trace_metadata({
-            "operation_success": True,
-            "commit_completed": True,
-            "push_completed": True
-        })
+        add_trace_metadata(
+            {
+                "operation_success": True,
+                "commit_completed": True,
+                "push_completed": True,
+            }
+        )
         add_trace_tags(["git_success", "commit_and_push_completed"])
-        
+
         return result
-        
+
     except subprocess.TimeoutExpired as e:
         logger.error(f"Git operation timed out: {e}")
         add_trace_tags(["git_timeout"])
@@ -451,14 +465,10 @@ def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
         return {
             "success": False,
             "error": f"Git operation timed out: {str(e)}",
-            "step": "timeout"
+            "step": "timeout",
         }
     except Exception as e:
         logger.error(f"Git operation failed: {str(e)}")
         add_trace_tags(["git_operation_error"])
         add_trace_metadata({"git_error": str(e)})
-        return {
-            "success": False,
-            "error": str(e),
-            "step": "exception"
-        }
+        return {"success": False, "error": str(e), "step": "exception"}
