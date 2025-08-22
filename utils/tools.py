@@ -1,6 +1,11 @@
 from langchain_core.tools import tool
 import shlex
 import requests
+import subprocess
+import sys
+import tempfile
+import os
+from typing import Optional
 from .logger import setup_logger, log_function_call
 from utils.parsers import remove_script_tags
 from .langsmith_utils import langsmith_trace, add_trace_tags, add_trace_metadata
@@ -176,3 +181,126 @@ def get_page_content(url: str):
         add_trace_tags(["content_fetch_failed"])
         add_trace_metadata({"fetch_error": str(e)})
         return {"error": str(e)}
+
+
+@tool
+@langsmith_trace(
+    name="execute_python_code",
+    run_type="tool",
+    tags=["python", "code_execution", "dynamic_execution"],
+    metadata={"tool_type": "code_executor"},
+)
+@log_function_call(logger)
+def execute_python_code(python_code: str, file_path: Optional[str] = None):
+    """Execute Python code provided as a string and return the output.
+    
+    Args:
+        python_code (str): The Python code to execute
+        file_path (str, optional): Path where to save the code file. If not provided, 
+                                 a temporary file will be created and deleted after execution.
+                                 If provided, the file will be saved permanently.
+        
+    Returns:
+        dict: Contains the execution result, output, and any errors
+    """
+    logger.info("Executing Python code")
+    add_trace_metadata({"code_length": len(python_code), "has_custom_path": file_path is not None})
+    add_trace_tags(["code_execution", "python_exec"])
+    
+    temp_file_path = None
+    should_cleanup = False
+    
+    try:
+        if file_path:
+            # Use the provided file path
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            
+            # Write code to the specified file
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(python_code)
+            
+            execution_file_path = file_path
+            logger.info(f"Created code file at: {file_path}")
+            add_trace_tags(["persistent_file"])
+        else:
+            # Create a temporary file to write the Python code
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as temp_file:
+                temp_file.write(python_code)
+                temp_file_path = temp_file.name
+                execution_file_path = temp_file_path
+                should_cleanup = True
+            
+            logger.info(f"Created temporary file: {temp_file_path}")
+            add_trace_tags(["temporary_file"])
+        
+        # Execute the Python code using subprocess
+        result = subprocess.run(
+            [sys.executable, execution_file_path],
+            capture_output=True,
+            text=True,
+            timeout=30  # 30 second timeout to prevent hanging
+        )
+        
+        # Clean up the temporary file only if it was temporary
+        if should_cleanup and temp_file_path:
+            os.unlink(temp_file_path)
+            temp_file_path = None
+        
+        execution_result = {
+            "return_code": result.returncode,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+            "success": result.returncode == 0,
+            "file_path": execution_file_path if not should_cleanup else None
+        }
+        
+        logger.info(f"Code execution completed with return code: {result.returncode}")
+        logger.info(f"Stdout length: {len(result.stdout)} characters")
+        logger.info(f"Stderr length: {len(result.stderr)} characters")
+        
+        # Add execution metadata to trace
+        add_trace_metadata({
+            "execution_success": result.returncode == 0,
+            "stdout_length": len(result.stdout),
+            "stderr_length": len(result.stderr),
+            "return_code": result.returncode
+        })
+        
+        if result.returncode == 0:
+            add_trace_tags(["execution_successful"])
+        else:
+            add_trace_tags(["execution_failed"])
+        
+        return execution_result
+        
+    except subprocess.TimeoutExpired:
+        logger.error("Code execution timed out")
+        add_trace_tags(["execution_timeout"])
+        add_trace_metadata({"timeout_error": True})
+        # Clean up the temporary file only if it was temporary
+        if should_cleanup and temp_file_path:
+            try:
+                os.unlink(temp_file_path)
+            except Exception:
+                pass
+        return {
+            "error": "Code execution timed out (30 seconds)",
+            "return_code": -1,
+            "success": False
+        }
+    except Exception as e:
+        logger.error(f"Code execution failed: {str(e)}")
+        add_trace_tags(["execution_error"])
+        add_trace_metadata({"execution_error": str(e)})
+        # Clean up the temporary file only if it was temporary
+        if should_cleanup and temp_file_path:
+            try:
+                os.unlink(temp_file_path)
+            except Exception:
+                pass
+        return {
+            "error": str(e),
+            "return_code": -1,
+            "success": False
+        }

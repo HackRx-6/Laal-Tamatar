@@ -7,6 +7,9 @@ from utils.models import ChallengeRequest, ChallengeResponse
 from utils.logger import setup_logger, log_request_response
 from utils.langsmith_utils import langsmith_trace, add_trace_tags, add_trace_metadata
 import uuid
+from dotenv import load_dotenv
+
+load_dotenv(override=True)
 
 logger = setup_logger(__name__)
 
@@ -44,7 +47,7 @@ async def log_requests(request: Request, call_next):
     name="root_endpoint",
     run_type="chain",
     tags=["api", "endpoint", "health"],
-    metadata={"endpoint": "/", "method": "GET"}
+    metadata={"endpoint": "/", "method": "GET"},
 )
 @log_request_response(logger)
 async def root():
@@ -61,7 +64,7 @@ async def root():
     name="health_check",
     run_type="chain",
     tags=["api", "health", "monitoring"],
-    metadata={"endpoint": "/health", "method": "GET"}
+    metadata={"endpoint": "/health", "method": "GET"},
 )
 @log_request_response(logger)
 async def health_check():
@@ -83,46 +86,48 @@ async def health_check():
     name="run_challenge_endpoint",
     run_type="chain",
     tags=["api", "challenge", "main_endpoint", "entry_point"],
-    metadata={"endpoint": "/run", "method": "POST"}
+    metadata={"endpoint": "/run", "method": "POST"},
 )
 @log_request_response(logger)
 async def run(request: ChallengeRequest):
     logger.info("Run endpoint accessed")
     logger.info(f"Request URL: {request.url}")
     logger.info(f"Number of questions: {len(request.questions)}")
-    
+
     # Add comprehensive trace metadata for the main entry point
-    add_trace_metadata({
-        "endpoint": "/run",
-        "request_url": str(request.url),
-        "questions_count": len(request.questions),
-        "questions": request.questions,
-        "request_type": "challenge_processing"
-    })
-    add_trace_tags([
-        "main_entry_point", 
-        "challenge_api", 
-        f"questions_{len(request.questions)}"
-    ])
-    
+    add_trace_metadata(
+        {
+            "endpoint": "/run",
+            "request_url": str(request.url),
+            "questions_count": len(request.questions),
+            "questions": request.questions,
+            "request_type": "challenge_processing",
+        }
+    )
+    add_trace_tags(
+        ["main_entry_point", "challenge_api", f"questions_{len(request.questions)}"]
+    )
+
     for i, question in enumerate(request.questions, 1):
         logger.info(f"Question {i}: {question}")
 
     try:
         logger.info("Starting to process challenge request")
         add_trace_tags(["processing_started"])
-        
+
         response = get_answers(request)
-        
+
         logger.info("Challenge request processed successfully")
         logger.info(f"Generated {len(response.answers)} answers")
-        
+
         # Add success metadata
-        add_trace_metadata({
-            "processing_status": "success",
-            "answers_generated": len(response.answers),
-            "answers": response.answers
-        })
+        add_trace_metadata(
+            {
+                "processing_status": "success",
+                "answers_generated": len(response.answers),
+                "answers": response.answers,
+            }
+        )
         add_trace_tags(["processing_completed", "success"])
 
         return response
@@ -130,15 +135,17 @@ async def run(request: ChallengeRequest):
     except Exception as e:
         logger.error(f"Processing failed: {str(e)}")
         logger.error(f"Exception type: {type(e).__name__}")
-        
+
         # Add error metadata to trace
-        add_trace_metadata({
-            "processing_status": "failed",
-            "error_type": type(e).__name__,
-            "error_message": str(e)
-        })
+        add_trace_metadata(
+            {
+                "processing_status": "failed",
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+            }
+        )
         add_trace_tags(["processing_failed", "error"])
-        
+
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
 
 

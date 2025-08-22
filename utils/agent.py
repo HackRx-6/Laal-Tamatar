@@ -1,18 +1,21 @@
 from langgraph.prebuilt import create_react_agent
-from utils.tools import make_curl_request, get_page_content
+from utils.tools import make_curl_request, execute_python_code
 from utils.llms import get_llm
 from langchain_core.messages import SystemMessage
 from utils.prompts import AGENT_SYSTEM_PROMPT
 from utils.models import ChallengeRequest, ChallengeResponse
 from .logger import setup_logger, log_function_call, log_request_response
 from .langsmith_utils import langsmith_trace, add_trace_tags, add_trace_metadata
+from dotenv import load_dotenv
+import os
 
+load_dotenv(override=True)
 logger = setup_logger(__name__)
 
 logger.info("Initializing agent...")
 agent = create_react_agent(
-    model=get_llm("gpt-4o", "azure"),
-    tools=[make_curl_request],
+    model=get_llm(os.getenv("MODEL_NAME"), os.getenv("ENDPOINT_TYPE")),
+    tools=[make_curl_request, execute_python_code],
 )
 logger.info("Agent initialized successfully")
 
@@ -35,6 +38,7 @@ def get_answers(challenge_request: ChallengeRequest) -> ChallengeResponse:
         {
             "num_questions": len(challenge_request.questions),
             "target_url": str(challenge_request.url),
+            "query": str(challenge_request.query),
             "request_id": id(challenge_request),
         }
     )
@@ -49,7 +53,7 @@ def get_answers(challenge_request: ChallengeRequest) -> ChallengeResponse:
         # Add tags for current question processing
         add_trace_tags([f"question_{i}", f"total_{len(challenge_request.questions)}"])
 
-        normal_prompt = f"Question: {question}\n\nURL: {str(challenge_request.url)}\n\nAnswer the question based on the information from the URL."
+        normal_prompt = f"Question: {question}\n\nURL: {str(challenge_request.url)}\n\nContext: {str(challenge_request.query)}\n\nUse the given URL and context to answer the question."
         logger.info(f"Generated prompt for question {i}: {normal_prompt}")
 
         try:
@@ -81,7 +85,10 @@ def get_answers(challenge_request: ChallengeRequest) -> ChallengeResponse:
     metadata={"component": "question_processor"},
 )
 def process_single_question(
-    question: str, url: str, prompt: str, question_index: int, total_questions: int
+    question: str,
+    prompt: str,
+    question_index: int,
+    total_questions: int,
 ) -> str:
     """Process a single question with LangSmith tracing"""
     logger.info(f"Processing question {question_index}/{total_questions}")
@@ -92,21 +99,14 @@ def process_single_question(
             "question": question,
             "question_index": question_index,
             "total_questions": total_questions,
-            "url": url,
         }
     )
     add_trace_tags([f"question_index_{question_index}", "single_question_processing"])
 
     try:
-        response = agent.invoke(
-            {
-                "messages": [
-                    SystemMessage(AGENT_SYSTEM_PROMPT),
-                    get_page_content(url),
-                    prompt,
-                ]
-            }
-        )
+        messages = [SystemMessage(AGENT_SYSTEM_PROMPT)]
+        messages.append(prompt)
+        response = agent.invoke({"messages": messages})
         logger.info(f"Agent response for question {question_index}: {response}")
 
         result = response["messages"][-1].content

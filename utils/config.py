@@ -18,8 +18,8 @@ LOG_REQUESTS_RESPONSES = os.getenv("LOG_REQUESTS_RESPONSES", "true").lower() == 
 LOG_HTTP_MIDDLEWARE = os.getenv("LOG_HTTP_MIDDLEWARE", "true").lower() == "true"
 
 LOG_FORMAT = os.getenv(
-    "LOG_FORMAT", 
-    "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
+    "LOG_FORMAT",
+    "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s",
 )
 
 # LangSmith Configuration

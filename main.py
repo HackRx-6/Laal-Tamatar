@@ -3,20 +3,21 @@ from utils.langsmith_utils import langsmith_trace, add_trace_tags, add_trace_met
 
 logger = setup_logger(__name__)
 
+
 @langsmith_trace(
     name="main_application",
     run_type="chain",
     tags=["application", "startup", "main"],
-    metadata={"component": "main_application"}
+    metadata={"component": "main_application"},
 )
 @log_function_call(logger)
 def main():
     logger.info("Application starting...")
     add_trace_tags(["app_startup"])
     add_trace_metadata({"application_name": "bajaj-hackrx-finals"})
-    
+
     print("Hello from bajaj-hackrx-finals!")
-    
+
     logger.info("Application finished successfully")
     add_trace_tags(["app_completed"])
 

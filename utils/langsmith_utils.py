@@ -1,12 +1,18 @@
 """
 LangSmith utilities for tracing and monitoring
 """
+
 import os
 import functools
 from typing import Any, Callable, Dict, Optional
 from langsmith import Client, traceable
 from langsmith.run_helpers import get_current_run_tree
-from utils.config import LANGSMITH_API_KEY, LANGSMITH_ENDPOINT, LANGSMITH_PROJECT, LANGSMITH_TRACING
+from utils.config import (
+    LANGSMITH_API_KEY,
+    LANGSMITH_ENDPOINT,
+    LANGSMITH_PROJECT,
+    LANGSMITH_TRACING,
+)
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -38,11 +44,11 @@ def langsmith_trace(
     tags: Optional[list] = None,
     metadata: Optional[Dict[str, Any]] = None,
     parent_run_id: Optional[str] = None,
-    project_name: Optional[str] = None
+    project_name: Optional[str] = None,
 ):
     """
     Decorator to trace function calls with LangSmith
-    
+
     Args:
         name: Name for the trace (defaults to function name)
         run_type: Type of run ("chain", "tool", "llm", "retriever", etc.)
@@ -51,31 +57,34 @@ def langsmith_trace(
         parent_run_id: Parent run ID for nested traces
         project_name: Override project name
     """
+
     def decorator(func: Callable) -> Callable:
         if not LANGSMITH_TRACING or not client:
             # If tracing is disabled, return original function
             return func
-            
+
         trace_name = name or func.__name__
         trace_tags = tags or []
         trace_metadata = metadata or {}
         trace_project = project_name or LANGSMITH_PROJECT
-        
+
         @functools.wraps(func)
         @traceable(
             name=trace_name,
             run_type=run_type,
             tags=trace_tags,
             metadata=trace_metadata,
-            project_name=trace_project
+            project_name=trace_project,
         )
         def wrapper(*args, **kwargs):
             try:
                 # Add function context to metadata
                 current_run = get_current_run_tree()
                 if current_run:
-                    current_run.add_tags([f"function:{func.__name__}", f"module:{func.__module__}"])
-                    
+                    current_run.add_tags(
+                        [f"function:{func.__name__}", f"module:{func.__module__}"]
+                    )
+
                 logger.info(f"Starting LangSmith trace: {trace_name}")
                 result = func(*args, **kwargs)
                 logger.info(f"Completed LangSmith trace: {trace_name}")
@@ -88,8 +97,9 @@ def langsmith_trace(
                     current_run.add_tags(["error"])
                     current_run.end(error=str(e))
                 raise
-                
+
         return wrapper
+
     return decorator
 
 
@@ -127,17 +137,17 @@ def create_child_trace(
     name: str,
     run_type: str = "chain",
     tags: Optional[list] = None,
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None,
 ):
     """Create a child trace under the current parent"""
     if not LANGSMITH_TRACING or not client:
         return None
-        
+
     parent_run_id = get_parent_run_id()
     return langsmith_trace(
         name=name,
         run_type=run_type,
         tags=tags,
         metadata=metadata,
-        parent_run_id=parent_run_id
+        parent_run_id=parent_run_id,
     )
