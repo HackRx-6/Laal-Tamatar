@@ -1,4 +1,4 @@
-def find_almost_equal(s, pattern):
+def find_almost_equal_index(s, pattern):
     n, m = len(s), len(pattern)
     for i in range(n - m + 1):
         substring = s[i:i+m]
@@ -14,5 +14,5 @@ def find_almost_equal(s, pattern):
 
 s = "ababbababa"
 pattern = "bacaba"
-result = find_almost_equal(s, pattern)
+result = find_almost_equal_index(s, pattern)
 print(result)
