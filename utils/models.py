@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import List, Optional
 from .logger import setup_logger
 
@@ -9,7 +9,7 @@ logger.info("Models module initialized")
 
 class ChallengeRequest(BaseModel):
     questions: List[str]  # Only required field
-    url: Optional[HttpUrl] = None
+    url: Optional[str] = None  # Changed from HttpUrl to str to accept any text
     query: Optional[str] = None
 
     # Allow additional fields

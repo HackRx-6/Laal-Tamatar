@@ -1,5 +1,5 @@
 from langgraph.prebuilt import create_react_agent
-from utils.tools import make_curl_request, execute_python_code
+from utils.tools import make_curl_request, execute_python_code, git_commit_and_push
 from utils.llms import get_llm
 from langchain_core.messages import SystemMessage
 from utils.prompts import AGENT_SYSTEM_PROMPT
@@ -15,7 +15,7 @@ logger = setup_logger(__name__)
 logger.info("Initializing agent...")
 agent = create_react_agent(
     model=get_llm(os.getenv("MODEL_NAME"), os.getenv("ENDPOINT_TYPE")),
-    tools=[make_curl_request, execute_python_code],
+    tools=[make_curl_request, execute_python_code, git_commit_and_push],
 )
 logger.info("Agent initialized successfully")
 
@@ -53,13 +53,18 @@ def get_answers(challenge_request: ChallengeRequest) -> ChallengeResponse:
         # Add tags for current question processing
         add_trace_tags([f"question_{i}", f"total_{len(challenge_request.questions)}"])
 
-        normal_prompt = f"Question: {question}\n\nURL: {str(challenge_request.url)}\n\nContext: {str(challenge_request.query)}\n\nUse the given URL and context to answer the question."
+        # Create a copy of challenge_request without the 'questions' field for context
+        context_data = challenge_request.model_dump(exclude={"questions"})
+        normal_prompt = (
+            f"Question: {question}\n\n"
+            f"Use the given URL and context to answer the question.\n\n"
+            f"Provided Context: {str(context_data)}"
+        )
         logger.info(f"Generated prompt for question {i}: {normal_prompt}")
 
         try:
             response = process_single_question(
                 question=question,
-                url=str(challenge_request.url),
                 prompt=normal_prompt,
                 question_index=i,
                 total_questions=len(challenge_request.questions),

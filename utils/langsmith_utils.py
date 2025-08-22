@@ -127,8 +127,7 @@ def add_trace_metadata(metadata: Dict[str, Any]):
     try:
         current_run = get_current_run_tree()
         if current_run:
-            for key, value in metadata.items():
-                current_run.add_metadata(key, value)
+            current_run.add_metadata(metadata)
     except Exception as e:
         logger.warning(f"Failed to add metadata to trace: {e}")
 

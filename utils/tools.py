@@ -193,87 +193,93 @@ def get_page_content(url: str):
 @log_function_call(logger)
 def execute_python_code(python_code: str, file_path: Optional[str] = None):
     """Execute Python code provided as a string and return the output.
-    
+
     Args:
-        python_code (str): The Python code to execute
-        file_path (str, optional): Path where to save the code file. If not provided, 
+        python_code (str): The Python code to execute, give the complete python code as it will be run normally, it is a normal python program that will be run via command line.
+        file_path (str, optional): Path where to save the code file. If not provided,
                                  a temporary file will be created and deleted after execution.
                                  If provided, the file will be saved permanently.
-        
+
     Returns:
         dict: Contains the execution result, output, and any errors
     """
     logger.info("Executing Python code")
-    add_trace_metadata({"code_length": len(python_code), "has_custom_path": file_path is not None})
+    add_trace_metadata(
+        {"code_length": len(python_code), "has_custom_path": file_path is not None}
+    )
     add_trace_tags(["code_execution", "python_exec"])
-    
+
     temp_file_path = None
     should_cleanup = False
-    
+
     try:
         if file_path:
             # Use the provided file path
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            
+
             # Write code to the specified file
-            with open(file_path, 'w', encoding='utf-8') as f:
+            with open(file_path, "w", encoding="utf-8") as f:
                 f.write(python_code)
-            
+
             execution_file_path = file_path
             logger.info(f"Created code file at: {file_path}")
             add_trace_tags(["persistent_file"])
         else:
             # Create a temporary file to write the Python code
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False, encoding='utf-8') as temp_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".py", delete=False, encoding="utf-8"
+            ) as temp_file:
                 temp_file.write(python_code)
                 temp_file_path = temp_file.name
                 execution_file_path = temp_file_path
                 should_cleanup = True
-            
+
             logger.info(f"Created temporary file: {temp_file_path}")
             add_trace_tags(["temporary_file"])
-        
+
         # Execute the Python code using subprocess
         result = subprocess.run(
             [sys.executable, execution_file_path],
             capture_output=True,
             text=True,
-            timeout=30  # 30 second timeout to prevent hanging
+            timeout=30,  # 30 second timeout to prevent hanging
         )
-        
+
         # Clean up the temporary file only if it was temporary
         if should_cleanup and temp_file_path:
             os.unlink(temp_file_path)
             temp_file_path = None
-        
+
         execution_result = {
             "return_code": result.returncode,
             "stdout": result.stdout,
             "stderr": result.stderr,
             "success": result.returncode == 0,
-            "file_path": execution_file_path if not should_cleanup else None
+            "file_path": execution_file_path if not should_cleanup else None,
         }
-        
+
         logger.info(f"Code execution completed with return code: {result.returncode}")
         logger.info(f"Stdout length: {len(result.stdout)} characters")
         logger.info(f"Stderr length: {len(result.stderr)} characters")
-        
+
         # Add execution metadata to trace
-        add_trace_metadata({
-            "execution_success": result.returncode == 0,
-            "stdout_length": len(result.stdout),
-            "stderr_length": len(result.stderr),
-            "return_code": result.returncode
-        })
-        
+        add_trace_metadata(
+            {
+                "execution_success": result.returncode == 0,
+                "stdout_length": len(result.stdout),
+                "stderr_length": len(result.stderr),
+                "return_code": result.returncode,
+            }
+        )
+
         if result.returncode == 0:
             add_trace_tags(["execution_successful"])
         else:
             add_trace_tags(["execution_failed"])
-        
+
         return execution_result
-        
+
     except subprocess.TimeoutExpired:
         logger.error("Code execution timed out")
         add_trace_tags(["execution_timeout"])
@@ -287,7 +293,7 @@ def execute_python_code(python_code: str, file_path: Optional[str] = None):
         return {
             "error": "Code execution timed out (30 seconds)",
             "return_code": -1,
-            "success": False
+            "success": False,
         }
     except Exception as e:
         logger.error(f"Code execution failed: {str(e)}")
@@ -299,8 +305,160 @@ def execute_python_code(python_code: str, file_path: Optional[str] = None):
                 os.unlink(temp_file_path)
             except Exception:
                 pass
+        return {"error": str(e), "return_code": -1, "success": False}
+
+
+@tool
+@langsmith_trace(
+    name="git_commit_and_push",
+    run_type="tool",
+    tags=["git", "version_control", "commit", "push"],
+    metadata={"tool_type": "git_operations"},
+)
+@log_function_call(logger)
+def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
+    """Commit current changes and push them to GitHub.
+    
+    Args:
+        commit_message (str): The commit message for the changes
+        branch (str, optional): The branch to push to. If not provided, pushes to current branch.
+        
+    Returns:
+        dict: Contains the git operation results and any output/errors
+    """
+    logger.info(f"Starting git commit and push with message: {commit_message}")
+    add_trace_metadata({"commit_message": commit_message, "target_branch": branch})
+    add_trace_tags(["git_commit", "git_push"])
+    
+    try:
+        # Get current working directory
+        cwd = os.getcwd()
+        logger.info(f"Working in directory: {cwd}")
+        
+        # Step 1: Add all changes
+        logger.info("Adding all changes to git...")
+        add_result = subprocess.run(
+            ["git", "add", "."],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if add_result.returncode != 0:
+            logger.error(f"Git add failed: {add_result.stderr}")
+            add_trace_tags(["git_add_failed"])
+            return {
+                "success": False,
+                "error": f"Git add failed: {add_result.stderr}",
+                "step": "add"
+            }
+        
+        logger.info("Git add successful")
+        
+        # Step 2: Check if there are any changes to commit
+        status_result = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        if not status_result.stdout.strip():
+            logger.info("No changes to commit")
+            add_trace_tags(["no_changes"])
+            return {
+                "success": True,
+                "message": "No changes to commit",
+                "step": "status_check"
+            }
+        
+        # Step 3: Commit changes
+        logger.info(f"Committing changes with message: {commit_message}")
+        commit_result = subprocess.run(
+            ["git", "commit", "-m", commit_message],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        
+        if commit_result.returncode != 0:
+            logger.error(f"Git commit failed: {commit_result.stderr}")
+            add_trace_tags(["git_commit_failed"])
+            return {
+                "success": False,
+                "error": f"Git commit failed: {commit_result.stderr}",
+                "step": "commit"
+            }
+        
+        logger.info("Git commit successful")
+        commit_output = commit_result.stdout
+        
+        # Step 4: Push to remote
+        if branch:
+            push_command = ["git", "push", "origin", branch]
+            logger.info(f"Pushing to specific branch: {branch}")
+        else:
+            push_command = ["git", "push"]
+            logger.info("Pushing to current branch")
+        
+        push_result = subprocess.run(
+            push_command,
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            timeout=60  # Longer timeout for push operations
+        )
+        
+        if push_result.returncode != 0:
+            logger.error(f"Git push failed: {push_result.stderr}")
+            add_trace_tags(["git_push_failed"])
+            return {
+                "success": False,
+                "error": f"Git push failed: {push_result.stderr}",
+                "step": "push",
+                "commit_output": commit_output
+            }
+        
+        logger.info("Git push successful")
+        push_output = push_result.stdout
+        
+        # Success - return all outputs
+        result = {
+            "success": True,
+            "commit_message": commit_message,
+            "commit_output": commit_output,
+            "push_output": push_output,
+            "target_branch": branch or "current branch"
+        }
+        
+        logger.info("Git commit and push completed successfully")
+        add_trace_metadata({
+            "operation_success": True,
+            "commit_completed": True,
+            "push_completed": True
+        })
+        add_trace_tags(["git_success", "commit_and_push_completed"])
+        
+        return result
+        
+    except subprocess.TimeoutExpired as e:
+        logger.error(f"Git operation timed out: {e}")
+        add_trace_tags(["git_timeout"])
+        add_trace_metadata({"timeout_error": str(e)})
         return {
+            "success": False,
+            "error": f"Git operation timed out: {str(e)}",
+            "step": "timeout"
+        }
+    except Exception as e:
+        logger.error(f"Git operation failed: {str(e)}")
+        add_trace_tags(["git_operation_error"])
+        add_trace_metadata({"git_error": str(e)})
+        return {
+            "success": False,
             "error": str(e),
-            "return_code": -1,
-            "success": False
+            "step": "exception"
         }
