@@ -28,10 +28,6 @@ def get_llm(model: str, mode: str):
         logger.info(f"Successfully created LLM instance for model: {model}")
         return llm
     if mode == "azure":
-        #         AZURE_OPENAI_API_KEY=7MMmELupHc7gW6DGAAQBfPs4H5CEwP856EZmOpEzUJGwhVeMMMeIJQQJ99BDACYeBjFXJ3w3AAABACOGpMkI
-        # AZURE_OPENAI_DEPLOYMENT="gpt-4o"
-        # OPENAI_API_VERSION=2025-01-01-preview
-        # AZURE_OPENAI_ENDPOINT=https://internaluse.openai.azure.com/openai/deployments/gpt-4o/chat/completions?api-version=2025-01-01-preview
         api_key = os.getenv("AZURE_OPENAI_API_KEY")
         base_url = os.getenv("AZURE_OPENAI_ENDPOINT")
         deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT")
