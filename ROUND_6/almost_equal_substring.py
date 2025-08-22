@@ -1,9 +1,10 @@
 def find_almost_equal_substring(s, pattern):
-    m, n = len(s), len(pattern)
-    for i in range(m - n + 1):
-        substring = s[i:i+n]
+    n, m = len(s), len(pattern)
+    
+    for i in range(n - m + 1):
+        substring = s[i:i+m]
         diff_count = 0
-        for j in range(n):
+        for j in range(m):
             if substring[j] != pattern[j]:
                 diff_count += 1
                 if diff_count > 1:
@@ -12,7 +13,9 @@ def find_almost_equal_substring(s, pattern):
             return i
     return -1
 
-s = "ababbababa"
-pattern = "bacaba"
-result = find_almost_equal_substring(s, pattern)
-print(result)
+
+if __name__ == "__main__":
+    s = "abcdefg"
+    pattern = "bcdffg"
+    result = find_almost_equal_substring(s, pattern)
+    print(result)
