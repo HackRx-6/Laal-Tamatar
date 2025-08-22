@@ -1,19 +1,18 @@
-def almost_equal(s, pattern):
+def find_almost_equal(s, pattern):
     n, m = len(s), len(pattern)
     for i in range(n - m + 1):
-        # Count the number of differing characters
+        substring = s[i:i+m]
         diff_count = 0
         for j in range(m):
-            if s[i + j] != pattern[j]:
+            if substring[j] != pattern[j]:
                 diff_count += 1
-                # If more than 1 character differs, break early
                 if diff_count > 1:
                     break
         if diff_count <= 1:
             return i
     return -1
 
-s = "abcdefg"
-pattern = "bcdffg"
-result = almost_equal(s, pattern)
+s = "ababbababa"
+pattern = "bacaba"
+result = find_almost_equal(s, pattern)
 print(result)

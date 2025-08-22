@@ -1,27 +1,17 @@
-# Given strings
-s = "ababbababa"
-pattern = "bacaba"
+def almost_equal_substring(s, pattern):
+    len_s = len(s)
+    len_p = len(pattern)
+    
+    for i in range(len_s - len_p + 1):
+        substring = s[i:i+len_p]
+        # Count the differences
+        diff = sum(1 for x, y in zip(substring, pattern) if x != y)
+        if diff <= 1:
+            return i
+    return -1
 
-pattern_length = len(pattern)
+s = "abcdefg"
+pattern = "bcdffg"
 
-# Function to check if two strings are almost equal
-# i.e. they differ by at most one character
-
-def almost_equal(x, y):
-    diff_count = 0
-    for i in range(len(x)):
-        if x[i] != y[i]:
-            diff_count += 1
-        if diff_count > 1:
-            return False
-    return True
-
-# Find the smallest starting index of substring in s almost equal to pattern
-result = -1
-for i in range(len(s) - pattern_length + 1):
-    substring = s[i:i + pattern_length]
-    if almost_equal(substring, pattern):
-        result = i
-        break
-
+result = almost_equal_substring(s, pattern)
 print(result)
