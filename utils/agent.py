@@ -1,5 +1,5 @@
 from langgraph.prebuilt import create_react_agent
-from utils.tools import make_curl_request, execute_python_code, git_commit_and_push
+from utils.tools import make_curl_request, execute_python_code, git_commit_and_push, get_github_repo_tree, get_github_file_contents
 from .parsers import extract_json
 from utils.llms import get_llm
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -16,7 +16,7 @@ logger = setup_logger(__name__)
 logger.info("Initializing agent...")
 agent = create_react_agent(
     model=get_llm(os.getenv("MODEL_NAME"), os.getenv("ENDPOINT_TYPE")),
-    tools=[make_curl_request, execute_python_code, git_commit_and_push],
+    tools=[make_curl_request, execute_python_code, git_commit_and_push, get_github_repo_tree, get_github_file_contents],
 )
 logger.info("Agent initialized successfully")
 
