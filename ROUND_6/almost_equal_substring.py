@@ -1,9 +1,13 @@
 def smallest_almost_equal_index(s, pattern):
-    n, m = len(s), len(pattern)
-    for i in range(n - m + 1):
+    m, n = len(s), len(pattern)
+    if n > m:
+        return -1
+    
+    for i in range(m - n + 1):
+        substr = s[i:i+n]
         diff_count = 0
-        for j in range(m):
-            if s[i + j] != pattern[j]:
+        for a, b in zip(substr, pattern):
+            if a != b:
                 diff_count += 1
                 if diff_count > 1:
                     break
@@ -11,9 +15,11 @@ def smallest_almost_equal_index(s, pattern):
             return i
     return -1
 
-
 if __name__ == "__main__":
-    s = "ababbababa"
-    pattern = "bacaba"
-    result = smallest_almost_equal_index(s, pattern)
-    print(result)
+    test_cases = [
+        ("abcdefg", "bcdffg"),
+        ("ababbababa", "bacaba")
+    ]
+    results = [smallest_almost_equal_index(s, p) for s, p in test_cases]
+    for result in results:
+        print(result)

@@ -16,19 +16,20 @@ load_dotenv(override=True)
 
 logger = setup_logger(__name__)
 
+
 def save_request_response(request_data: dict, response_data: dict):
     """Save request and response JSON to temp/requests.json file"""
     try:
         # Ensure temp directory exists
         os.makedirs("temp", exist_ok=True)
-        
+
         # Prepare data with timestamp
         entry = {
             "timestamp": datetime.now().isoformat(),
             "request": request_data,
-            "response": response_data
+            "response": response_data,
         }
-        
+
         # Read existing data or create new list
         requests_file = "temp/requests.json"
         if os.path.exists(requests_file):
@@ -36,17 +37,18 @@ def save_request_response(request_data: dict, response_data: dict):
                 data = json.load(f)
         else:
             data = []
-        
+
         # Append new entry
         data.append(entry)
-        
+
         # Write back to file
         with open(requests_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
-        
+
         logger.info(f"Saved request/response to {requests_file}")
     except Exception as e:
         logger.error(f"Failed to save request/response: {str(e)}")
+
 
 app = FastAPI(
     title="Team Laal Tamatar's API !",
