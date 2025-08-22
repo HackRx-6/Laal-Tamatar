@@ -57,8 +57,10 @@ def get_answers(challenge_request: ChallengeRequest) -> ChallengeResponse:
         context_data = challenge_request.model_dump(exclude={"questions"})
         normal_prompt = (
             f"Question: {question}\n\n"
-            f"Use the given URL and context to answer the question.\n\n"
-            f"Provided Context: {str(context_data)}"
+            f"You are an expert assistant. Please answer the following question as thoroughly and accurately as possible, using the provided context. "
+            f"Be detailed, clear, and ensure your answer is helpful and relevant to the question. "
+            f"If the context does not contain enough information, use your best judgment to provide a useful answer, but indicate any assumptions you make.\n\n"
+            f"Provided Context:\n{str(context_data)}\n\n"
         )
         logger.info(f"Generated prompt for question {i}: {normal_prompt}")
 
