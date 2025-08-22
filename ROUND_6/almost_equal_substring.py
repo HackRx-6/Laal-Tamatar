@@ -1,28 +1,26 @@
-# Given strings
+# Code to find the smallest starting index of a substring in s that is almost equal to pattern
+
 s = "abcdefg"
 pattern = "bcdffg"
 
-# Function to find the smallest starting index of a substring in s that is almost equal to pattern
-# A string x is almost equal to y if you can change at most one character in x to make it identical to y.
-def find_almost_equal_substring(s, pattern):
-    len_s = len(s)
-    len_p = len(pattern)
-    
-    for i in range(len_s - len_p + 1):
-        # substring of s from i to i + len_p
-        substring = s[i:i+len_p]
-        
-        # count the number of differences
-        diff_count = 0
-        for j in range(len_p):
-            if substring[j] != pattern[j]:
-                diff_count += 1
-                if diff_count > 1:
-                    break
-        # if differences are at most one, return the starting index
-        if diff_count <= 1:
+
+def is_almost_equal(x, y):
+    count_diff = 0
+    for i in range(len(x)):
+        if x[i] != y[i]:
+            count_diff += 1
+            if count_diff > 1:
+                return False
+    return True
+
+
+def smallest_almost_equal_index(s, pattern):
+    m, n = len(s), len(pattern)
+    for i in range(m - n + 1):
+        if is_almost_equal(s[i:i + n], pattern):
             return i
     return -1
 
-result = find_almost_equal_substring(s, pattern)
+
+result = smallest_almost_equal_index(s, pattern)
 print(result)
