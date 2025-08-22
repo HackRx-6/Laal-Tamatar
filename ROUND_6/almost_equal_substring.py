@@ -1,9 +1,10 @@
-def smallest_starting_index(s: str, pattern: str) -> int:
+def find_smallest_almost_equal_index(s: str, pattern: str) -> int:
     n, m = len(s), len(pattern)
     for i in range(n - m + 1):
+        substring = s[i:i+m]
         diff_count = 0
-        for j in range(m):
-            if s[i + j] != pattern[j]:
+        for a, b in zip(substring, pattern):
+            if a != b:
                 diff_count += 1
                 if diff_count > 1:
                     break
@@ -15,11 +16,11 @@ if __name__ == "__main__":
     # Test case 1
     s1 = "abcdefg"
     pattern1 = "bcdffg"
-    result1 = smallest_starting_index(s1, pattern1)
+    result1 = find_smallest_almost_equal_index(s1, pattern1)
+    print(result1)  # Expected output
 
     # Test case 2
     s2 = "ababbababa"
     pattern2 = "bacaba"
-    result2 = smallest_starting_index(s2, pattern2)
-
-    print([result1, result2])
+    result2 = find_smallest_almost_equal_index(s2, pattern2)
+    print(result2)  # Expected output
