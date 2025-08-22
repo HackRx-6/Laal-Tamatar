@@ -1,11 +1,13 @@
 # Given strings
-s = "ababbababa"
-pattern = "bacaba"
+s = "abcdefg"
+pattern = "bcdffg"
 
 # Function to check if two strings are almost equal
-# i.e., differ in at most one character
+# almost equal means at most one character difference
 
-def is_almost_equal(x, y):
+def almost_equal(x, y):
+    if len(x) != len(y):
+        return False
     diff_count = 0
     for i in range(len(x)):
         if x[i] != y[i]:
@@ -14,17 +16,18 @@ def is_almost_equal(x, y):
                 return False
     return True
 
-# Function to find smallest start index of a substring in s almost equal to pattern
+# Find smallest starting index of substring in s that is almost equal to pattern
 
-def smallest_almost_equal_index(s, pattern):
-    n = len(s)
-    m = len(pattern)
+def find_almost_equal_index(s, pattern):
+    n, m = len(s), len(pattern)
     for i in range(n - m + 1):
         substring = s[i:i+m]
-        if is_almost_equal(substring, pattern):
+        if almost_equal(substring, pattern):
             return i
     return -1
 
-# Call the function and print result
-result = smallest_almost_equal_index(s, pattern)
+# Get the result
+result = find_almost_equal_index(s, pattern)
+
+# Print the result
 print(result)

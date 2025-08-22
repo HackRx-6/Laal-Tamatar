@@ -1,12 +1,10 @@
-def almost_equal_substring_index(s, pattern):
-    len_s = len(s)
-    len_p = len(pattern)
-    
-    for i in range(len_s - len_p + 1):
-        substring = s[i:i+len_p]
+def find_almost_equal_substring(s, pattern):
+    m, n = len(s), len(pattern)
+    for i in range(m - n + 1):
+        substring = s[i:i+n]
         diff_count = 0
-        for a, b in zip(substring, pattern):
-            if a != b:
+        for j in range(n):
+            if substring[j] != pattern[j]:
                 diff_count += 1
                 if diff_count > 1:
                     break
@@ -14,8 +12,7 @@ def almost_equal_substring_index(s, pattern):
             return i
     return -1
 
-s = "abcdefg"
-pattern = "bcdffg"
-
-result = almost_equal_substring_index(s, pattern)
+s = "ababbababa"
+pattern = "bacaba"
+result = find_almost_equal_substring(s, pattern)
 print(result)
