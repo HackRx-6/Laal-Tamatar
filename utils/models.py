@@ -8,9 +8,13 @@ logger.info("Models module initialized")
 
 
 class ChallengeRequest(BaseModel):
+    questions: List[str]  # Only required field
     url: Optional[HttpUrl] = None
     query: Optional[str] = None
-    questions: List[str]
+
+    # Allow additional fields
+    class Config:
+        extra = "allow"  # This allows additional fields not explicitly defined
 
     def __init__(self, **data):
         logger.info(f"Creating ChallengeRequest with data: {data}")
@@ -18,6 +22,12 @@ class ChallengeRequest(BaseModel):
         logger.info(
             f"ChallengeRequest created successfully with {len(self.questions)} questions"
         )
+
+        # Log any additional fields that were provided
+        defined_fields = {"questions", "url", "query"}
+        additional_fields = set(data.keys()) - defined_fields
+        if additional_fields:
+            logger.info(f"Additional fields provided: {additional_fields}")
 
 
 class ChallengeResponse(BaseModel):
