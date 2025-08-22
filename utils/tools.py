@@ -191,14 +191,12 @@ def get_page_content(url: str):
     metadata={"tool_type": "code_executor"},
 )
 @log_function_call(logger)
-def execute_python_code(python_code: str, file_path: Optional[str] = None):
+def execute_python_code(python_code: str, file_path):
     """Execute Python code provided as a string and return the output.
 
     Args:
         python_code (str): The Python code to execute, give the complete python code as it will be run normally, it is a normal python program that will be run via command line.
-        file_path (str, optional): Path where to save the code file. If not provided,
-                                 a temporary file will be created and deleted after execution.
-                                 If provided, the file will be saved permanently.
+        file_path (str): Path where to save the code file.
 
     Returns:
         dict: Contains the execution result, output, and any errors
