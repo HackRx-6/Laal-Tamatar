@@ -1,16 +1,20 @@
 from langgraph.prebuilt import create_react_agent
+import os
 from utils.tools import make_curl_request
 from utils.llms import get_llm
 from langchain_core.messages import SystemMessage
 from utils.prompts import AGENT_SYSTEM_PROMPT
+from dotenv import load_dotenv
 from utils.models import ChallengeRequest, ChallengeResponse
 from .logger import setup_logger, log_function_call, log_request_response
+
+load_dotenv(override=True)
 
 logger = setup_logger(__name__)
 
 logger.info("Initializing agent...")
 agent = create_react_agent(
-    model=get_llm("gpt-5-nano", "openai"),
+    model=get_llm(os.getenv("MODEL_NAME"), os.getenv("ENDPOINT_TYPE")),
     tools=[make_curl_request],
 )
 logger.info("Agent initialized successfully")
