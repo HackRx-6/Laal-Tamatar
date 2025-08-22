@@ -129,6 +129,9 @@ async def run(request: ChallengeRequest):
     logger.info(f"Request URL: {request.url}")
     logger.info(f"Number of questions: {len(request.questions)}")
 
+    # Convert request to dict for saving
+    request_dict = request.model_dump()
+
     # Add comprehensive trace metadata for the main entry point
     add_trace_metadata(
         {
@@ -154,6 +157,12 @@ async def run(request: ChallengeRequest):
 
         logger.info("Challenge request processed successfully")
         logger.info(f"Generated {len(response.answers)} answers")
+
+        # Convert response to dict for saving
+        response_dict = response.model_dump()
+
+        # Save request and response to file
+        save_request_response(request_dict, response_dict)
 
         # Add success metadata
         add_trace_metadata(
