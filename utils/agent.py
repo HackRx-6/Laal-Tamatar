@@ -10,7 +10,7 @@ from .parsers import extract_json
 from utils.llms import get_llm
 from langchain_core.messages import SystemMessage, HumanMessage
 from utils.prompts import AGENT_SYSTEM_PROMPT
-from utils.models import ChallengeRequest, ChallengeResponse, BrowserState
+from utils.models import ChallengeRequest, ChallengeResponse
 from .logger import setup_logger, log_request_response
 from .langsmith_utils import langsmith_trace, add_trace_tags, add_trace_metadata
 from dotenv import load_dotenv
