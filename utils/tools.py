@@ -7,7 +7,6 @@ import tempfile
 import os
 from typing import Optional
 from .logger import setup_logger, log_function_call
-from utils.parsers import remove_script_tags
 from .langsmith_utils import langsmith_trace, add_trace_tags, add_trace_metadata
 
 
@@ -473,3 +472,277 @@ def git_commit_and_push(commit_message: str, branch: Optional[str] = None):
         add_trace_tags(["git_operation_error"])
         add_trace_metadata({"git_error": str(e)})
         return {"success": False, "error": str(e), "step": "exception"}
+
+
+@tool
+@langsmith_trace(
+    name="get_github_repo_tree",
+    run_type="tool",
+    tags=["github", "api", "repository", "tree"],
+    metadata={"tool_type": "github_api"},
+)
+@log_function_call(logger)
+def get_github_repo_tree(github_url: str, branch: str = "main"):
+    """Get the work tree structure of a GitHub repository using GitHub API.
+    
+    Args:
+        github_url (str): The GitHub repository URL (e.g., "https://github.com/owner/repo" or "owner/repo")
+        branch (str): The branch name to get the tree from (default: "main")
+    
+    Examples:
+        get_github_repo_tree("https://github.com/octocat/Hello-World")
+        get_github_repo_tree("octocat/Hello-World", "develop")
+        get_github_repo_tree("microsoft/vscode", "main")
+    
+    Returns:
+        dict: Contains the repository tree structure with file paths and types
+    """
+    logger.info(f"Getting GitHub repository tree for: {github_url}")
+    add_trace_metadata({"repo_url": github_url, "branch": branch})
+    add_trace_tags(["github_tree", "repo_structure"])
+    
+    try:
+        # Extract owner and repo from URL
+        import re
+        # Handle both full URLs and owner/repo format
+        if github_url.startswith("http"):
+            match = re.match(r"https://github\.com/([^/]+)/([^/]+)", github_url.rstrip("/"))
+            if not match:
+                raise ValueError("Invalid GitHub URL format")
+            owner, repo = match.groups()
+        else:
+            # Assume format is "owner/repo"
+            if "/" not in github_url:
+                raise ValueError("Invalid repository format. Use 'owner/repo' or full URL")
+            owner, repo = github_url.split("/", 1)
+        
+        # Remove .git suffix if present
+        repo = repo.replace(".git", "")
+        
+        logger.info(f"Parsed repository: {owner}/{repo}")
+        add_trace_metadata({"owner": owner, "repo": repo})
+        
+        # GitHub API endpoint for getting repository tree
+        api_url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
+        
+        # Make request to GitHub API
+        headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "GitHub-Tree-Fetcher"
+        }
+        
+        logger.info("Making unauthenticated request to public repository")
+        add_trace_tags(["public_repo"])
+        
+        response = requests.get(api_url, headers=headers, timeout=30)
+        
+        if response.status_code == 404:
+            logger.error(f"Repository or branch not found: {owner}/{repo}@{branch}")
+            add_trace_tags(["repo_not_found"])
+            return {
+                "success": False,
+                "error": f"Repository or branch not found: {owner}/{repo}@{branch}",
+                "status_code": 404
+            }
+        elif response.status_code != 200:
+            logger.error(f"GitHub API request failed with status {response.status_code}")
+            add_trace_tags(["api_error"])
+            return {
+                "success": False,
+                "error": f"GitHub API request failed: {response.status_code} - {response.text}",
+                "status_code": response.status_code
+            }
+        
+        tree_data = response.json()
+        
+        # Process tree data
+        tree_items = []
+        for item in tree_data.get("tree", []):
+            tree_items.append({
+                "path": item["path"],
+                "type": item["type"],  # "blob" for files, "tree" for directories
+                "sha": item["sha"],
+                "size": item.get("size"),
+                "url": item.get("url")
+            })
+        
+        result = {
+            "success": True,
+            "repository": f"{owner}/{repo}",
+            "branch": branch,
+            "tree_sha": tree_data.get("sha"),
+            "total_items": len(tree_items),
+            "tree": tree_items
+        }
+        
+        logger.info(f"Successfully retrieved tree with {len(tree_items)} items")
+        add_trace_metadata({
+            "tree_items_count": len(tree_items),
+            "tree_sha": tree_data.get("sha")
+        })
+        add_trace_tags(["tree_retrieved_successfully"])
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to get GitHub repository tree: {str(e)}")
+        add_trace_tags(["tree_fetch_failed"])
+        add_trace_metadata({"error": str(e)})
+        return {
+            "success": False,
+            "error": f"Failed to get repository tree: {str(e)}"
+        }
+
+
+@tool
+@langsmith_trace(
+    name="get_github_file_contents",
+    run_type="tool",
+    tags=["github", "api", "files", "content"],
+    metadata={"tool_type": "github_api"},
+)
+@log_function_call(logger)
+def get_github_file_contents(github_url: str, file_paths: list, branch: str = "main"):
+    """Get the contents of one or more files from a GitHub repository using GitHub API.
+    
+    Args:
+        github_url (str): The GitHub repository URL (e.g., "https://github.com/owner/repo" or "owner/repo")
+        file_paths (list): List of file paths within the repository to retrieve
+        branch (str): The branch name to get files from (default: "main")
+    
+    Examples:
+        get_github_file_contents("https://github.com/octocat/Hello-World", ["README.md"])
+        get_github_file_contents("octocat/Hello-World", ["src/main.py", "config/settings.json"])
+        get_github_file_contents("microsoft/vscode", ["package.json", "src/vs/code/electron-main/main.ts"], "main")
+        get_github_file_contents("facebook/react", ["packages/react/index.js", "packages/react-dom/index.js"])
+    
+    Returns:
+        dict: Contains the file contents and metadata for each requested file
+    """
+    logger.info(f"Getting GitHub file contents for {len(file_paths)} files from: {github_url}")
+    add_trace_metadata({
+        "repo_url": github_url, 
+        "branch": branch, 
+        "file_count": len(file_paths),
+        "files": file_paths
+    })
+    add_trace_tags(["github_files", "content_fetch"])
+    
+    try:
+        # Extract owner and repo from URL
+        import re
+        import base64
+        
+        # Handle both full URLs and owner/repo format
+        if github_url.startswith("http"):
+            match = re.match(r"https://github\.com/([^/]+)/([^/]+)", github_url.rstrip("/"))
+            if not match:
+                raise ValueError("Invalid GitHub URL format")
+            owner, repo = match.groups()
+        else:
+            # Assume format is "owner/repo"
+            if "/" not in github_url:
+                raise ValueError("Invalid repository format. Use 'owner/repo' or full URL")
+            owner, repo = github_url.split("/", 1)
+        
+        # Remove .git suffix if present
+        repo = repo.replace(".git", "")
+        
+        logger.info(f"Parsed repository: {owner}/{repo}")
+        add_trace_metadata({"owner": owner, "repo": repo})
+        
+        # Prepare headers for GitHub API
+        headers = {
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "GitHub-File-Fetcher"
+        }
+        
+        logger.info("Making unauthenticated request to public repository")
+        add_trace_tags(["public_repo"])
+        
+        files_data = []
+        errors = []
+        
+        for file_path in file_paths:
+            logger.info(f"Fetching file: {file_path}")
+            
+            # GitHub API endpoint for getting file contents
+            api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{file_path}?ref={branch}"
+            
+            try:
+                response = requests.get(api_url, headers=headers, timeout=30)
+                
+                if response.status_code == 404:
+                    error_msg = f"File not found: {file_path}"
+                    logger.warning(error_msg)
+                    errors.append({"file": file_path, "error": error_msg, "status_code": 404})
+                    continue
+                elif response.status_code != 200:
+                    error_msg = f"API request failed for {file_path}: {response.status_code}"
+                    logger.error(error_msg)
+                    errors.append({"file": file_path, "error": error_msg, "status_code": response.status_code})
+                    continue
+                
+                file_data = response.json()
+                
+                # Decode file content if it's base64 encoded
+                content = ""
+                if file_data.get("encoding") == "base64":
+                    try:
+                        content = base64.b64decode(file_data["content"]).decode("utf-8")
+                    except UnicodeDecodeError:
+                        # File might be binary
+                        content = f"[Binary file - {file_data.get('size', 0)} bytes]"
+                        logger.info(f"File {file_path} appears to be binary")
+                else:
+                    content = file_data.get("content", "")
+                
+                files_data.append({
+                    "path": file_path,
+                    "content": content,
+                    "size": file_data.get("size"),
+                    "sha": file_data.get("sha"),
+                    "type": file_data.get("type"),
+                    "encoding": file_data.get("encoding"),
+                    "download_url": file_data.get("download_url")
+                })
+                
+                logger.info(f"Successfully retrieved file: {file_path} ({file_data.get('size', 0)} bytes)")
+                
+            except requests.RequestException as e:
+                error_msg = f"Request failed for {file_path}: {str(e)}"
+                logger.error(error_msg)
+                errors.append({"file": file_path, "error": error_msg})
+        
+        result = {
+            "success": len(files_data) > 0 or len(errors) == 0,
+            "repository": f"{owner}/{repo}",
+            "branch": branch,
+            "files_retrieved": len(files_data),
+            "files_requested": len(file_paths),
+            "files": files_data,
+            "errors": errors
+        }
+        
+        logger.info(f"File retrieval completed: {len(files_data)} successful, {len(errors)} errors")
+        add_trace_metadata({
+            "files_retrieved": len(files_data),
+            "files_with_errors": len(errors),
+            "total_requested": len(file_paths)
+        })
+        
+        if len(files_data) > 0:
+            add_trace_tags(["files_retrieved_successfully"])
+        if len(errors) > 0:
+            add_trace_tags(["some_files_failed"])
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to get GitHub file contents: {str(e)}")
+        add_trace_tags(["file_fetch_failed"])
+        add_trace_metadata({"error": str(e)})
+        return {
+            "success": False,
+            "error": f"Failed to get file contents: {str(e)}"
+        }

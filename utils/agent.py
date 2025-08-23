@@ -1,22 +1,35 @@
 from langgraph.prebuilt import create_react_agent
-from utils.tools import make_curl_request, execute_python_code, git_commit_and_push
+from utils.tools import (
+    make_curl_request,
+    execute_python_code,
+    git_commit_and_push,
+    get_github_repo_tree,
+    get_github_file_contents,
+)
 from .parsers import extract_json
 from utils.llms import get_llm
 from langchain_core.messages import SystemMessage, HumanMessage
 from utils.prompts import AGENT_SYSTEM_PROMPT
-from utils.models import ChallengeRequest, ChallengeResponse
+from utils.models import ChallengeRequest, ChallengeResponse, BrowserState
 from .logger import setup_logger, log_request_response
 from .langsmith_utils import langsmith_trace, add_trace_tags, add_trace_metadata
 from dotenv import load_dotenv
 import os
 
 load_dotenv(override=True)
+print(os.getenv("MODEL_NAME"))
 logger = setup_logger(__name__)
 
 logger.info("Initializing agent...")
 agent = create_react_agent(
     model=get_llm(os.getenv("MODEL_NAME"), os.getenv("ENDPOINT_TYPE")),
-    tools=[make_curl_request, execute_python_code, git_commit_and_push],
+    tools=[
+        make_curl_request,
+        execute_python_code,
+        git_commit_and_push,
+        get_github_repo_tree,
+        get_github_file_contents,
+    ],
 )
 logger.info("Agent initialized successfully")
 
