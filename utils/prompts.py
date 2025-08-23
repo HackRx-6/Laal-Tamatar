@@ -94,6 +94,7 @@ Provide a concise and appropriate answer answering the user's query only. Don't 
 Provide the final answer as a json array of the answers like:
 ["answer 1", "answer 2", ...]
 The json array should be like this only.
+Every answer should be a string even if it is an integer/float/number answer.
 
 # Safety Constraints
 
