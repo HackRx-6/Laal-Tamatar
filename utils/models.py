@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 from .logger import setup_logger
 
 logger = setup_logger(__name__)
